@@ -1,21 +1,39 @@
 import pgzero, pgzrun, pygame
 import math, sys, random
+import print as print
 from enum import Enum
 
-# Check Python version number. sys.version_info gives version as a tuple, e.g. if (3,7,2,'final',0) for version 3.7.2.
-# Unlike many languages, Python can compare two tuples in the same way that you can compare numbers.
-if sys.version_info < (3,5):
-    print("This game requires at least version 3.5 of Python. Please download it from www.python.org")
+# Verifique el número de versión de Python. sys.version_info da
+# la versión como una tupla, p. ej. if (3,7,2, 'final', 0) para la versión 3.7.2.
+
+# A diferencia de muchos lenguajes, Python puede comparar dos tuplas
+# de la misma manera que puede comparar números.
+from pgzero.actor import Actor
+
+if sys.version_info < (1, 5):
+    print("Este juego requiere al menos la versión 3.5 de Python. Descárguelo de www.python.org")
     sys.exit()
 
-# Check Pygame Zero version. This is a bit trickier because Pygame Zero only lets us get its version number as a string.
-# So we have to split the string into a list, using '.' as the character to split on. We convert each element of the
-# version number into an integer - but only if the string contains numbers and nothing else, because it's possible for
-# a component of the version to contain letters as well as numbers (e.g. '2.0.dev0')
-# We're using a Python feature called list comprehension - this is explained in the Bubble Bobble/Cavern chapter.
+# Verifique la versión de Pygame Zero.
+# Esto es un poco más complicado porque Pygame Zero
+# solo nos permite obtener su número
+# de versión como una cadena.
+# Entonces tenemos que dividir la cadena en una lista,
+# usando '.' como el personaje en el que se dividirá.
+# Convertimos cada elemento del número de versión
+# en un entero, pero solo si la cadena contiene números y nada más,
+# porque es posible para un componente de la versión
+# para contener letras y números (por ejemplo, '2.0.dev0')
+# Estamos usando una función de Python
+# llamada comprensión de listas;
+# esto se explica en el capítulo Bubble Bobble / Cavern.
+
 pgzero_version = [int(s) if s.isnumeric() else s for s in pgzero.__version__.split('.')]
-if pgzero_version < [1,2]:
-    print("This game requires at least version 1.2 of Pygame Zero. You have version {0}. Please upgrade using the command 'pip3 install --upgrade pgzero'".format(pgzero.__version__))
+if pgzero_version < [1, 2]:
+    print("Este juego requiere al menos la versión 1.2 de Pygame Zero "
+          "Tiene la versión {0}. Actualice con el comando"
+          "'pip3 install --upgrade pgzero'"
+          .format(pgzero.__version__))
     sys.exit()
 
 # Set up constants
@@ -26,134 +44,171 @@ TITLE = "Boing!"
 HALF_WIDTH = WIDTH // 2
 HALF_HEIGHT = HEIGHT // 2
 
-PLAYER_SPEED = 6
-MAX_AI_SPEED = 6
+ANCHO_BATE = 18
+ALTO_BATE = 128
+MITAD_ALTO_BATE = ALTO_BATE // 2
+ANCHO_BOLA = 48
+DIST_BATE_FONDO = 40
+POS_X_REBOTE = ((WIDTH - ANCHO_BATE - ANCHO_BOLA) // 2) - DIST_BATE_FONDO
+MAX_DIF_X_AL_CENTRO = 220
+
+PLAYER_SPEED = 10
+MAX_AI_SPEED = 4
+
 
 def normalised(x, y):
-    # Return a unit vector
-    # Get length of vector (x,y) - math.hypot uses Pythagoras' theorem to get length of hypotenuse
-    # of right-angle triangle with sides of length x and y
+    # Devuelve un vector unitario
+    # Obtener la longitud del vector (x, y) - math.hypot usa el teorema de Pitágoras
+    # para obtener la longitud de la hipotenusa
+    # de triángulo rectángulo con lados de longitud xey
     # todo note on safety
     length = math.hypot(x, y)
     return (x / length, y / length)
 
+
 def sign(x):
-    # Returns -1 or 1 depending on whether number is positive or negative
+    # Devuelve -1 o 1 dependiendo cuando el número es positivo o negativo
     return -1 if x < 0 else 1
 
 
-# Class for an animation which is displayed briefly whenever the ball bounces
 class Impact(Actor):
+    # Clase para una animación que se muestra brevemente
+    # cada vez que la pelota rebota
     def __init__(self, pos):
         super().__init__("blank", pos)
         self.time = 0
 
     def update(self):
-        # There are 5 impact sprites numbered 0 to 4. We update to a new sprite every 2 frames.
+        # Hay 5 sprites de impacto numerados del 0 al 4.
+        # Actualizamos a un nuevo sprite cada 2 fotogramas.
         self.image = "impact" + str(self.time // 2)
 
-        # The Game class maintains a list of Impact instances. In Game.update, if the timer for an object
-        # has gone beyond 10, the object is removed from the list.
+        # La clase Game mantiene una lista de instancias de Impact.
+        # En Game.update, si el temporizador de un objeto
+        # ha ido más allá de 10, el objeto se elimina de la lista.
         self.time += 1
 
 
 class Ball(Actor):
     def __init__(self, dx):
-        super().__init__("ball", (0,0))
+        super().__init__("ball", (0, 0))
 
         self.x, self.y = HALF_WIDTH, HALF_HEIGHT
 
-        # dx and dy together describe the direction in which the ball is moving. For example, if dx and dy are 1 and 0,
-        # the ball is moving to the right, with no movement up or down. If both values are negative, the ball is moving
-        # left and up, with the angle depending on the relative values of the two variables. If you're familiar with
-        # vectors, dx and dy represent a unit vector. If you're not familiar with vectors, see the explanation in the
-        # book.
+        # dx y dy juntos describen la dirección en la que se mueve la pelota.
+        # Por ejemplo, si dx y dy son 1 y 0, la pelota se mueve hacia la derecha,
+        # sin movimiento hacia arriba o hacia abajo.
+        # Si ambos valores son negativos,la bola se mueve hacia la izquierda y hacia arriba,
+        # con el ángulo dependiendo de los valores relativos de las dos variables.
+        # Si estas familiarizado con los vectores, dx y dy representan un vector unitario.
+        # Si no está familiarizado con los vectores, consulte la explicación en el libro.
         self.dx, self.dy = dx, 0
 
         self.speed = 5
 
     def update(self):
-        # Each frame, we move the ball in a series of small steps - the number of steps being based on its speed attribute
+        # En cada cuadro, movemos la pelota en una serie de pequeños pasos;
+        # el número de pasos se basa en su atributo de velocidad.
         for i in range(self.speed):
-            # Store the previous x position
+            # Guarda la posicion x previa
             original_x = self.x
 
-            # Move the ball based on dx and dy
+            # Mueve la pelota en base a dx y dy
             self.x += self.dx
             self.y += self.dy
 
-            # Check to see if ball needs to bounce off a bat
+            # Verifique si la pelota necesita rebotar en un bate
 
-            # To determine whether the ball might collide with a bat, we first measure the horizontal distance from the
-            # ball to the centre of the screen, and check to see if its edge has gone beyond the edge of the bat.
-            # The centre of each bat is 40 pixels from the edge of the screen, or to put it another way, 360 pixels
-            # from the centre of the screen. The bat is 18 pixels wide and the ball is 14 pixels wide. Given that these
-            # sprites are anchored from their centres, when determining if they overlap or touch, we need to look at
-            # their half-widths - 9 and 7. Therefore, if the centre of the ball is 344 pixels from the centre of the
-            # screen, it can bounce off a bat (assuming the bat is in the right position on the Y axis - checked
-            # shortly afterwards).
-            # We also check the previous X position to ensure that this is the first frame in which the ball crossed the threshold.
-            if abs(self.x - HALF_WIDTH) >= 344 and abs(original_x - HALF_WIDTH) < 344:
+            # Para determinar si la pelota puede chocar con un bate,
+            # primero medimos la distancia horizontal desde la bola
+            # al centro de la pantalla y verifique si su borde
+            # ha ido más allá del borde del bate.
+            # El centro de cada bate está a 40 píxeles del borde de la pantalla,
+            # o para decirlo de otra manera, 360 píxeles desde el centro de la pantalla.
+            # El bate tiene 18 píxeles de ancho y la bola tiene 14 píxeles de ancho.
+            # Dado que estos los sprites están anclados desde sus centros, al determinar
+            # si se superponen o se tocan, debemos mirar sus medias anchuras: 9 y 7.
+            # Por lo tanto, si el centro de la bola está a 344 píxeles del centro de la
+            # pantalla, puede rebotar en un bate (asumiendo que el bate está
+            # en la posición correcta en el eje Y - marcado Poco después).
+            # También comprobamos la posición X anterior
+            # para asegurarnos de que este es el primer fotograma
+            # en el que la pelota cruzó el umbral.
 
-                # Now that we know the edge of the ball has crossed the threshold on the x-axis, we need to check to
-                # see if the bat on the relevant side of the arena is at a suitable position on the y-axis for the
-                # ball collide with it.
+            if abs(self.x - HALF_WIDTH) >= POS_X_REBOTE and abs(original_x - HALF_WIDTH) < POS_X_REBOTE:
 
-                if self.x < HALF_WIDTH:
-                    new_dir_x = 1
-                    bat = game.bats[0]
-                else:
-                    new_dir_x = -1
-                    bat = game.bats[1]
+                # Ahora que sabemos que el borde de la pelota ha cruzado el umbral en el eje x,
+                # debemos verificar si el bate en el lado relevante de la arena
+                # está en una posición adecuada en el eje 'y' para la bola choca con el.
 
-                difference_y = self.y - bat.y
+                if self.x < HALF_WIDTH:  # Si la pelota esta en el lado izdo.
+                    new_dir_x = 1        # toma direccion positiva en x
+                    bat = game.bats[0]   # ??
+                else:                    # Si la pelota esta en el lado dcho.
+                    new_dir_x = -1       # toma direccion negativa en x
+                    bat = game.bats[1]   # ??
 
-                if difference_y > -64 and difference_y < 64:
-                    # Ball has collided with bat - calculate new direction vector
+                difference_y = self.y - bat.y   # Obtiene la diferencia etre la 'Y' de la bola
+                                                # y la 'Y' del bate
 
-                    # To understand the maths used below, we first need to consider what would happen with this kind of
-                    # collision in the real world. The ball is bouncing off a perfectly vertical surface. This makes for a
-                    # pretty simple calculation. Let's take a ball which is travelling at 1 metre per second to the right,
-                    # and 2 metres per second down. Imagine this is taking place in space, so gravity isn't a factor.
-                    # After the ball hits the bat, it's still going to be moving at 2 m/s down, but it's now going to be
-                    # moving 1 m/s to the left instead of right. So its speed on the y-axis hasn't changed, but its
-                    # direction on the x-axis has been reversed. This is extremely easy to code - "self.dx = -self.dx".
-                    # However, games don't have to perfectly reflect reality.
-                    # In Pong, hitting the ball with the upper or lower parts of the bat would make it bounce diagonally
-                    # upwards or downwards respectively. This gives the player a degree of control over where the ball
-                    # goes. To make for a more interesting game, we want to use realistic physics as the starting point,
-                    # but combine with this the ability to influence the direction of the ball. When the ball hits the
-                    # bat, we're going to deflect the ball slightly upwards or downwards depending on where it hit the
-                    # bat. This gives the player a bit of control over where the ball goes.
+                if difference_y > - MITAD_ALTO_BATE  and difference_y < MITAD_ALTO_BATE:
+                    # La bola ha chocado con el bate - calcular el nuevo vector de dirección
 
-                    # Bounce the opposite way on the X axis
+                    # Para comprender las matemáticas que se utilizan a continuación,
+                    # primero debemos considerar qué sucedería con este tipo de
+                    # colisión en el mundo real. La pelota rebota en una superficie
+                    # perfectamente vertical. Esto lo convierte en un cálculo bastante simple.
+                    # Tomemos una bola que viaja a 1 metro por segundo hacia la derecha,
+                    # y 2 metros por segundo hacia abajo. Imagina que esto está sucediendo
+                    # en el espacio, por lo que la gravedad no es un factor.
+                    # Después de que la pelota golpee el bate, todavía se moverá a 2 m / s
+                    # hacia abajo, pero ahora estara moviéndose 1 m / s hacia la izquierda
+                    # en lugar de hacia la derecha. Entonces su velocidad en el eje y no ha
+                    # cambiado, pero su dirección en el eje x se ha invertido.
+                    # Esto es extremadamente fácil de codificar: "self.dx = -self.dx".
+                    # Sin embargo, los juegos no tienen que reflejar perfectamente la realidad.
+                    # En Pong, golpear la pelota con la parte superior o inferior del bate
+                    # la haría rebotar en diagonalhacia arriba o hacia abajo respectivamente.
+                    # Esto le da al jugador un grado de control sobre el lugar donde la va pelota
+                    # Para hacer un juego más interesante, queremos usar la física realista
+                    # como punto de partida, pero combine con esto la capacidad de influir en
+                    # la dirección de la pelota. Cuando la pelota golpea el bate,
+                    # vamos a desviar la pelota ligeramente hacia arriba o hacia abajo
+                    # dependiendo de dónde golpeó el bate.
+                    # Esto le da al jugador un poco de control sobre dónde va la pelota.
+
+                    # Rebota en sentido contrario en el eje X
                     self.dx = -self.dx
 
-                    # Deflect slightly up or down depending on where ball hit bat
-                    self.dy += difference_y / 128
+                    # Desvía ligeramente hacia arriba o hacia abajo dependiendo
+                    # de dónde golpeó la bola con el bate
+                    self.dy += difference_y / ALTO_BATE
 
-                    # Limit the Y component of the vector so we don't get into a situation where the ball is bouncing
-                    # up and down too rapidly
+                    # Limita el componente Y del vector para que no entremos en una situación
+                    # en la que la pelota esté rebotando sube y baja demasiado rápido
                     self.dy = min(max(self.dy, -1), 1)
 
-                    # Ensure our direction vector is a unit vector, i.e. represents a distance of the equivalent of
-                    # 1 pixel regardless of its angle
+                    # Asegúrese de que nuestro vector de dirección sea un vector unitario,
+                    # es decir, que represente una distancia del equivalente de
+                    # 1 píxel independientemente de su ángulo
                     self.dx, self.dy = normalised(self.dx, self.dy)
 
-                    # Create an impact effect
-                    game.impacts.append(Impact((self.x - new_dir_x * 10, self.y)))
-
-                    # Increase speed with each hit
+                    # Crea un efecto de impacto
+                    #game.impacts.append(Impact((self.x - new_dir_x * 10, self.y)))
+                    game.impacts.append(Impact(self.pos))
+                    # Aumenta la velocidad con cada impacto
                     self.speed += 1
 
-                    # Add an offset to the AI player's target Y position, so it won't aim to hit the ball exactly
-                    # in the centre of the bat
+                    # Agrega un desplazamiento a la posición Y objetivo del jugador AI,
+                    # por lo que no apuntara a golpear la pelota exactamente
+                    # en el centro del bate
                     game.ai_offset = random.randint(-10, 10)
 
-                    # Bat glows for 10 frames
+                    # Bate brilla durante 10 cuadros
                     bat.timer = 10
 
-                    # Play hit sounds, with more intense sound effects as the ball gets faster
+                    # Reproduce sonidos de golpe, con efectos de sonido más intensos a medida
+                    # que la pelota se vuelve más rápida.
                     game.play_sound("hit", 5)  # play every time in addition to:
                     if self.speed <= 10:
                         game.play_sound("hit_slow", 1)
@@ -164,14 +219,14 @@ class Ball(Actor):
                     else:
                         game.play_sound("hit_veryfast", 1)
 
-            # The top and bottom of the arena are 220 pixels from the centre
-            if abs(self.y - HALF_HEIGHT) > 220:
-                # Invert vertical direction and apply new dy to y so that the ball is no longer overlapping with the
-                # edge of the arena
+            # La parte superior e inferior de la arena están a 220 píxeles del centro
+            if abs(self.y - HALF_HEIGHT) > MAX_DIF_X_AL_CENTRO:
+                # Invierta la dirección vertical y aplique un nuevo dy ay para que la bola
+                # ya no se superponga con el borde de la arena
                 self.dy = -self.dy
                 self.y += self.dy
 
-                # Create impact effect
+                # Crea un efecto de impacto
                 game.impacts.append(Impact(self.pos))
 
                 # Sound effect
@@ -282,17 +337,24 @@ class Game:
         self.ai_offset = 0
 
     def update(self):
-        # Update all active objects
+        # Actualiza todos los objetos activos
         for obj in self.bats + [self.ball] + self.impacts:
             obj.update()
 
-        # Remove any expired impact effects from the list. We go through the list backwards, starting from the last
-        # element, and delete any elements those time attribute has reached 10. We go backwards through the list
-        # instead of forwards to avoid a number of issues which occur in that scenario. In the next chapter we will
-        # look at an alternative technique for removing items from a list, using list comprehensions.
-        for i in range(len(self.impacts) - 1, -1, -1):
-            if self.impacts[i].time >= 10:
-                del self.impacts[i]
+            # Elimine los efectos de impacto vencidos de la lista.
+            # Repasamos la lista al revés, comenzando desde el último
+            # elemento, y elimine cualquier elemento cuyo atributo
+            # de tiempo haya llegado a 10.
+            # Vamos hacia atrás a través de la lista.
+            # en lugar de reenviar para evitar una serie de problemas
+            # que ocurren en ese escenario.
+            # En el próximo capítulo busque una técnica alternativa
+            # para eliminar elementos de una lista, utilizando
+            # listas por comprensión.
+
+            for i in range(len(self.impacts) - 1, -1, -1):
+                if self.impacts[i].time >= 10:
+                    del self.impacts[i]
 
         # Has ball gone off the left or right edge of the screen?
         if self.ball.out():
@@ -320,12 +382,12 @@ class Game:
 
     def draw(self):
         # Draw background
-        screen.blit("table", (0,0))
+        screen.blit("table", (0, 0))
 
         # Draw 'just scored' effects, if required
-        for p in (0,1):
+        for p in (0, 1):
             if self.bats[p].timer > 0 and game.ball.out():
-                screen.blit("effect" + str(p), (0,0))
+                screen.blit("effect" + str(p), (0, 0))
 
         # Draw bats, ball and impact effects - in that order. Square brackets are needed around the ball because
         # it's just an object, whereas the other two are lists - and you can't directly join an object onto a
@@ -334,11 +396,11 @@ class Game:
             obj.draw()
 
         # Display scores - outer loop goes through each player
-        for p in (0,1):
+        for p in (0, 1):
             # Convert score into a string of 2 digits (e.g. "05") so we can later get the individual digits
             score = "{0:02d}".format(self.bats[p].score)
             # Inner loop goes through each digit
-            for i in (0,1):
+            for i in (0, 1):
                 # Digit sprites are numbered 00 to 29, where the first digit is the colour (0 = grey,
                 # 1 = blue, 2 = green) and the second digit is the digit itself
                 # Colour is usually grey but turns red or green (depending on player number) when a
@@ -346,7 +408,7 @@ class Game:
                 colour = "0"
                 other_p = 1 - p
                 if self.bats[other_p].timer > 0 and game.ball.out():
-                    colour = "2" if p == 0  else "1"
+                    colour = "2" if p == 0 else "1"
                 image = "digit" + colour + str(score[i])
                 screen.blit(image, (255 + (160 * p) + (i * 55), 46))
 
@@ -365,6 +427,7 @@ class Game:
             except:
                 pass
 
+
 def p1_controls():
     move = 0
     if keyboard.z or keyboard.down:
@@ -372,6 +435,7 @@ def p1_controls():
     elif keyboard.a or keyboard.up:
         move = -PLAYER_SPEED
     return move
+
 
 def p2_controls():
     move = 0
@@ -381,10 +445,12 @@ def p2_controls():
         move = -PLAYER_SPEED
     return move
 
+
 class State(Enum):
     MENU = 1
     PLAY = 2
     GAME_OVER = 3
+
 
 num_players = 1
 
@@ -441,15 +507,16 @@ def update():
             # Create a new Game object, without any players
             game = Game()
 
+
 def draw():
     game.draw()
 
     if state == State.MENU:
         menu_image = "menu" + str(num_players - 1)
-        screen.blit(menu_image, (0,0))
+        screen.blit(menu_image, (0, 0))
 
     elif state == State.GAME_OVER:
-        screen.blit("over", (0,0))
+        screen.blit("over", (0, 0))
 
 
 # The mixer allows us to play sounds and music
