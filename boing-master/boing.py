@@ -2,13 +2,14 @@ import pgzero, pgzrun, pygame
 import math, sys, random
 import print as print
 from enum import Enum
+from pgzero.actor import Actor
 
 # Verifique el número de versión de Python. sys.version_info da
 # la versión como una tupla, p. ej. if (3,7,2, 'final', 0) para la versión 3.7.2.
 
 # A diferencia de muchos lenguajes, Python puede comparar dos tuplas
 # de la misma manera que puede comparar números.
-from pgzero.actor import Actor
+
 
 if sys.version_info < (1, 5):
     print("Este juego requiere al menos la versión 3.5 de Python. Descárguelo de www.python.org")
@@ -37,23 +38,22 @@ if pgzero_version < [1, 2]:
     sys.exit()
 
 # Set up constants
-WIDTH = 800
-HEIGHT = 480
+WIDTH = 1520
+HEIGHT = 800
 TITLE = "Boing!"
-
-HALF_WIDTH = WIDTH // 2
-HALF_HEIGHT = HEIGHT // 2
 
 ANCHO_BATE = 18
 ALTO_BATE = 128
 MITAD_ALTO_BATE = ALTO_BATE // 2
 ANCHO_BOLA = 48
-DIST_BATE_FONDO = 40
+DIST_BATE_FONDO = WIDTH * 0.05
 POS_X_REBOTE = ((WIDTH - ANCHO_BATE - ANCHO_BOLA) // 2) - DIST_BATE_FONDO
-MAX_DIF_X_AL_CENTRO = 220
+MAX_DIF_Y_AL_CENTRO = HEIGHT // 2 - 20
+TOPE_ALTO_BATE = HEIGHT - 80
+TOPE_BAJO_BATE = 80
 
 PLAYER_SPEED = 10
-MAX_AI_SPEED = 4
+MAX_AI_SPEED = 6
 
 
 def normalised(x, y):
@@ -93,7 +93,7 @@ class Ball(Actor):
     def __init__(self, dx):
         super().__init__("ball", (0, 0))
 
-        self.x, self.y = HALF_WIDTH, HALF_HEIGHT
+        self.x, self.y = WIDTH // 2, HEIGHT // 2
 
         # dx y dy juntos describen la dirección en la que se mueve la pelota.
         # Por ejemplo, si dx y dy son 1 y 0, la pelota se mueve hacia la derecha,
@@ -135,13 +135,13 @@ class Ball(Actor):
             # para asegurarnos de que este es el primer fotograma
             # en el que la pelota cruzó el umbral.
 
-            if abs(self.x - HALF_WIDTH) >= POS_X_REBOTE and abs(original_x - HALF_WIDTH) < POS_X_REBOTE:
+            if abs(self.x - WIDTH // 2) >= POS_X_REBOTE and abs(original_x - WIDTH // 2) < POS_X_REBOTE:
 
                 # Ahora que sabemos que el borde de la pelota ha cruzado el umbral en el eje x,
                 # debemos verificar si el bate en el lado relevante de la arena
                 # está en una posición adecuada en el eje 'y' para la bola choca con el.
 
-                if self.x < HALF_WIDTH:  # Si la pelota esta en el lado izdo.
+                if self.x < WIDTH // 2:  # Si la pelota esta en el lado izdo.
                     new_dir_x = 1        # toma direccion positiva en x
                     bat = game.bats[0]   # ??
                 else:                    # Si la pelota esta en el lado dcho.
@@ -151,7 +151,7 @@ class Ball(Actor):
                 difference_y = self.y - bat.y   # Obtiene la diferencia etre la 'Y' de la bola
                                                 # y la 'Y' del bate
 
-                if difference_y > - MITAD_ALTO_BATE  and difference_y < MITAD_ALTO_BATE:
+                if difference_y > - ALTO_BATE // 2 and difference_y < ALTO_BATE // 2:
                     # La bola ha chocado con el bate - calcular el nuevo vector de dirección
 
                     # Para comprender las matemáticas que se utilizan a continuación,
@@ -220,7 +220,7 @@ class Ball(Actor):
                         game.play_sound("hit_veryfast", 1)
 
             # La parte superior e inferior de la arena están a 220 píxeles del centro
-            if abs(self.y - HALF_HEIGHT) > MAX_DIF_X_AL_CENTRO:
+            if abs(self.y - HEIGHT // 2) > MAX_DIF_Y_AL_CENTRO:
                 # Invierta la dirección vertical y aplique un nuevo dy ay para que la bola
                 # ya no se superponga con el borde de la arena
                 self.dy = -self.dy
@@ -240,8 +240,8 @@ class Ball(Actor):
 
 class Bat(Actor):
     def __init__(self, player, move_func=None):
-        x = 40 if player == 0 else 760
-        y = HALF_HEIGHT
+        x = DIST_BATE_FONDO if player == 0 else WIDTH-DIST_BATE_FONDO
+        y = HEIGHT // 2
         super().__init__("blank", (x, y))
 
         self.player = player
@@ -276,7 +276,7 @@ class Bat(Actor):
 
         # Aplique y_movement en la posición y, asegurándose de que el bate
         # no atraviese las paredes laterales
-        self.y = min(400, max(80, self.y + y_movement))
+        self.y = min(TOPE_ALTO_BATE, max(TOPE_BAJO_BATE, self.y + y_movement))
 
         # Elige el objeto apropiado. Hay 3 sprites por jugador,
         # p. Ej. bat00 es el jugador zurdo sprite de bate estándar,
@@ -303,7 +303,7 @@ class Bat(Actor):
         # If the ball is far away, we move towards the centre of the screen (HALF_HEIGHT), on the basis that we don't
         # yet know whether the ball will be in the top or bottom half of the screen when it reaches our position on
         # the X axis. By waiting at a central position, we're as ready as it's possible to be for all eventualities.
-        target_y_1 = HALF_HEIGHT
+        target_y_1 = HEIGHT // 2
 
         # If the ball is close, we want to move towards its position on the Y axis. We also apply a small offset which
         # is randomly generated each time the ball bounces. This is to make the computer player slightly less robotic
@@ -317,7 +317,7 @@ class Bat(Actor):
         # ball is at the same position as us on the X axis, our target will be target_y_2. If it's 200 pixels away,
         # we'll aim for halfway between target_y_1 and target_y_2. This reflects the idea that as the ball gets closer,
         # we have a better idea of where it's going to end up.
-        weight1 = min(1, x_distance / HALF_WIDTH)
+        weight1 = min(1, x_distance / (WIDTH // 2))
         weight2 = 1 - weight1
 
         target_y = (weight1 * target_y_1) + (weight2 * target_y_2)
