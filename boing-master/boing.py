@@ -205,7 +205,7 @@ class Ball(Actor):
                     game.ai_offset = random.randint(-10, 10)
 
                     # Bate brilla durante 10 cuadros
-                    bat.timer = 10
+                    bat.timer = 15
 
                     # Reproduce sonidos de golpe, con efectos de sonido más intensos a medida
                     # que la pelota se vuelve más rápida.
@@ -229,12 +229,12 @@ class Ball(Actor):
                 # Crea un efecto de impacto
                 game.impacts.append(Impact(self.pos))
 
-                # Sound effect
+                # Efecto de sonido
                 game.play_sound("bounce", 5)
                 game.play_sound("bounce_synth", 1)
 
     def out(self):
-        # Has ball gone off the left or right edge of the screen?
+        # ¿La bola se ha salido del borde izquierdo o derecho de la pantalla?
         return self.x < 0 or self.x > WIDTH
 
 
@@ -247,35 +247,43 @@ class Bat(Actor):
         self.player = player
         self.score = 0
 
-        # move_func is a function we may or may not have been passed by the code which created this object. If this bat
-        # is meant to be player controlled, move_func will be a function that when called, returns a number indicating
-        # the direction and speed in which the bat should move, based on the keys the player is currently pressing.
-        # If move_func is None, this indicates that this bat should instead be controlled by the AI method.
+        # move_func es una función que puede o no haber sido pasada por el codigo
+        # que creó este objeto. Si este bate está destinado a ser controlado por el jugador,
+        # move_func será una función que, cuando se llama, devuelve un número que indica
+        # la dirección y velocidad en la que debe moverse el bate, según las teclas
+        # que el jugador está presionando actualmente.
+        # Si move_func es None, indica que este bate debería ser controlado por el método AI.
         if move_func != None:
             self.move_func = move_func
         else:
             self.move_func = self.ai
 
-        # Each bat has a timer which starts at zero and counts down by one every frame. When a player concedes a point,
-        # their timer is set to 20, which causes the bat to display a different animation frame. It is also used to
-        # decide when to create a new ball in the centre of the screen - see comments in Game.update for more on this.
-        # Finally, it is used in Game.draw to determine when to display a visual effect over the top of the background
+        # Cada bate tiene un temporizador que comienza en cero y cuenta hacia atrás
+        # de uno en uno en cada cuadro. Cuando un jugador concede un punto,
+        # su temporizador está configurado en 20, lo que hace que el bate
+        # muestre un cuadro de animación diferente. También se utiliza para
+        # decidir cuándo crear una nueva bola en el centro de la pantalla;
+        # consulte los comentarios en Game.update para obtener más información al respecto.
+        # Finalmente, se usa en Game.draw para determinar cuándo mostrar un efecto visual
+        # en la parte superior del fondo
         self.timer = 0
 
     def update(self):
         self.timer -= 1
 
-        # Our movement function tells us how much to move on the Y axis
+        # Nuestra función de movimiento nos dice cuánto movernos en el eje Y
         y_movement = self.move_func()
 
-        # Apply y_movement to y position, ensuring bat does not go through the side walls
+        # Aplique y_movement en la posición y, asegurándose de que el bate
+        # no atraviese las paredes laterales
         self.y = min(400, max(80, self.y + y_movement))
 
-        # Choose the appropriate sprite. There are 3 sprites per player - e.g. bat00 is the left-hand player's
-        # standard bat sprite, bat01 is the sprite to use when the ball has just bounced off the bat, and bat02
-        # is the sprite to use when the bat has just missed the ball and the ball has gone out of bounds.
-        # bat10, 11 and 12 are the equivalents for the right-hand player
-
+        # Elige el objeto apropiado. Hay 3 sprites por jugador,
+        # p. Ej. bat00 es el jugador zurdo sprite de bate estándar,
+        # bat01 es el sprite que se usa cuando la pelota acaba de rebotar en el bate,
+        # y bat02 es el objeto que se usa cuando el bate acaba de fallar la pelota
+        # y la pelota se sale de los límites.
+        # bat10, 11 y 12 son los equivalentes para el jugador derecho
         frame = 0
         if self.timer > 0:
             if game.ball.out():
