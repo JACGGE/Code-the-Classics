@@ -104,7 +104,7 @@ class Ball(Actor):
         # Si no está familiarizado con los vectores, consulte la explicación en el libro.
         self.dx, self.dy = dx, 0
 
-        self.speed = 5
+        self.speed = 10
 
     def update(self):
         # En cada cuadro, movemos la pelota en una serie de pequeños pasos;
@@ -149,7 +149,7 @@ class Ball(Actor):
                     bat = game.bats[1]   # ??
 
                 difference_y = self.y - bat.y   # Obtiene la diferencia etre la 'Y' de la bola
-                                                # y la 'Y' del bate
+                # y la 'Y' del bate
 
                 if difference_y > - ALTO_BATE // 2 and difference_y < ALTO_BATE // 2:
                     # La bola ha chocado con el bate - calcular el nuevo vector de dirección
@@ -294,15 +294,20 @@ class Bat(Actor):
         self.image = "bat" + str(self.player) + str(frame)
 
     def ai(self):
-        # Returns a number indicating how the computer player will move - e.g. 4 means it will move 4 pixels down
-        # the screen.
+        # Devuelve un número que indica cómo se moverá el jugador
+        # de la computadora, p. Ej. 4 significa que se moverá 4 píxeles hacia abajo
 
-        # To decide where we want to go, we first check to see how far we are from the ball.
+        # Para decidir adónde queremos ir, primero comprobamos qué tan lejos
+        # estamos de la pelota.
+
         x_distance = abs(game.ball.x - self.x)
 
-        # If the ball is far away, we move towards the centre of the screen (HALF_HEIGHT), on the basis that we don't
-        # yet know whether the ball will be in the top or bottom half of the screen when it reaches our position on
-        # the X axis. By waiting at a central position, we're as ready as it's possible to be for all eventualities.
+        # Si la bola está lejos, nos movemos hacia el centro de la pantalla
+        # (HALF_HEIGHT), sobre la base de que aún no sabemos si la bola estará
+        # en la mitad superior o inferior de la pantalla cuando llegue a nuestra
+        # posición en el eje X Al esperar en una posición central,
+        # estamos lo más preparados posible para todas las eventualidades.
+
         target_y_1 = HEIGHT // 2
 
         # If the ball is close, we want to move towards its position on the Y axis. We also apply a small offset which
@@ -418,7 +423,7 @@ class Game:
                 if self.bats[other_p].timer > 0 and game.ball.out():
                     colour = "2" if p == 0 else "1"
                 image = "digit" + colour + str(score[i])
-                screen.blit(image, (255 + (160 * p) + (i * 55), 46))
+                screen.blit(image, (615 + (160 * p) + (i * 55), 90))
 
     def play_sound(self, name, count=1):
         # Some sounds have multiple varieties. If count > 1, we'll randomly choose one from those
